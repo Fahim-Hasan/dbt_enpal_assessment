@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:latest
@@ -12,15 +10,33 @@ services:
       - ./raw_data:/raw_data  # Mount raw_data folder to access CSV files
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   data_loader:
     image: postgres:latest
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./raw_data:/raw_data
     entrypoint: /bin/bash /raw_data/load_data.sh
     environment:
       PGPASSWORD: admin
+    links:
+      - db
+
+  dbt:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/usr/app
+    environment:
+      DBT_HOST: db  # profiles.yml falls back to localhost when this isn't set (host workflow)
     links:
       - db

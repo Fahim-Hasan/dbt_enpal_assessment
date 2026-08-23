@@ -1,0 +1,20 @@
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+target/
+
+# MetricFlow local cache
+.metricflow/
+metricflow/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+.DS_Store
+
+# agent operating context, not part of the deliverable repo
+CLAUDE.md

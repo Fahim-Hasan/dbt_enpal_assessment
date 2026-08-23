@@ -1,0 +1,17 @@
+# Pinned to a mutually-compatible set as of 2026-08-23 (verified against PyPI dependency metadata).
+# dbt-metricflow 0.14.0 requires dbt-core>=1.11,<1.13, which is why this project runs dbt 1.11.x
+# rather than the newest dbt-core release.
+
+# --- dbt core + adapter ---
+dbt-core==1.11.14
+dbt-postgres==1.11.0
+
+# --- semantic layer (MetricFlow, local/CLI usage against this Postgres warehouse) ---
+dbt-metricflow[postgres]==0.14.0
+
+# --- linting (also drives the sqlfluff pre-commit hook) ---
+sqlfluff==4.3.0
+sqlfluff-templater-dbt==4.3.0
+
+# --- git hook framework ---
+pre-commit==4.6.2

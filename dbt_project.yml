@@ -34,3 +34,12 @@ models:
     # Config indicated by + and applies to all files under models/example/
     +schema: pipedrive_analytics
     +materialized: table
+
+  # Installed packages are NOT covered by the +schema config above (that only scopes to this
+  # project's own models), so without this they'd fall back to the default target schema
+  # (`public`) and land next to the raw source tables. dbt_project_evaluator's diagnostic
+  # models (base_*/stg_*/int_*/fct_*) are only meant to be built on demand for an audit
+  # (`dbt build --select package:dbt_project_evaluator`, not part of a routine `dbt run`), and
+  # when they are, they should be clearly isolated in their own schema.
+  dbt_project_evaluator:
+    +schema: dbt_project_evaluator
