@@ -1,0 +1,47 @@
+# pip install pre-commit && pre-commit install
+#
+# NOTE: sqlfluff-lint uses the `dbt` templater, which compiles models through dbt's Jinja
+# context — that requires `dbt deps` to have been run at least once (models/packages must be
+# resolvable) AND a reachable Postgres instance (`docker compose up -d db`). Lint will fail with
+# a connection error, not a lint error, if the database isn't up.
+# raw_data/ and init.sql belong to the raw data loading mechanism, which is explicitly
+# off-limits (never modified, including by auto-fixing hooks). Excluded globally so this holds
+# regardless of which hooks are added later.
+exclude: ^raw_data/|^init\.sql$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.3.0
+    hooks:
+      - id: sqlfluff-lint
+        files: ^models/.*\.sql$
+        additional_dependencies:
+          - dbt-postgres==1.11.0
+          - sqlfluff-templater-dbt==4.3.0
+
+  # dbt-checkpoint: per-model/source contribution checks, run against a freshly-parsed
+  # manifest (dbt-parse must run first in this same pass). dbt-parse is a static metadata
+  # parse, not a compile/run, so it doesn't require a live Postgres connection.
+  - repo: https://github.com/dbt-checkpoint/dbt-checkpoint
+    rev: v2.0.10
+    hooks:
+      - id: dbt-parse
+        additional_dependencies:
+          - dbt-postgres==1.11.0
+      - id: check-model-has-description
+        files: ^models/
+      - id: check-model-has-tests
+        files: ^models/
+      - id: check-source-has-description
+        files: ^models/
+      - id: check-script-has-no-table-name
+        files: ^models/

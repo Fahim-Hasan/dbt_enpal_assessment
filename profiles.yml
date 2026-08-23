@@ -2,11 +2,14 @@ enpal_assessment_project:
   outputs:
     dev:
       dbname: postgres
-      host: localhost
+      # Defaults to localhost for the host-machine/pip workflow (README setup); the `dbt`
+      # docker-compose service overrides this to `db` (the Postgres service name) since it
+      # reaches Postgres over the compose network, not localhost.
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
       pass: admin
-      port: 5432
+      port: "{{ env_var('DBT_PORT', '5432') | as_number }}"
       schema: public
-      threads: 1
+      threads: 4
       type: postgres
       user: admin
   target: dev
