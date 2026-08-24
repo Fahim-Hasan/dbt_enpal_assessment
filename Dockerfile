@@ -5,8 +5,13 @@ FROM python:3.11-slim
 # target platform (e.g. arm64). git: dbt's dependency check (`dbt debug`) and `dbt deps` for
 # git-sourced packages both require the git binary on PATH.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev git \
+    && apt-get install -y --no-install-recommends build-essential libpq-dev git curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI: native installer, no Node.js runtime required -- lets a contributor run
+# `claude` inside the dev container the same way it's used locally to develop this project.
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/root/.local/bin:${PATH}"
 
 ENV PIP_NO_CACHE_DIR=1 \
     DBT_PROFILES_DIR=/usr/app \

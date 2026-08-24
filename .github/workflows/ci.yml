@@ -1,0 +1,96 @@
+name: CI
+
+# Slim CI: only builds/tests models affected by this PR (state:modified+), deferring everything
+# else to the most recent successful main-branch build instead of rebuilding the whole project
+# or leaving upstream models stale. See .github/workflows/publish-dbt-state.yml for how the
+# reference state gets produced.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  DBT_HOST: db
+  # Username stays "admin" -- raw_data/load_data.sh hardcodes -U admin and is off-limits to edit,
+  # so the CI Postgres instance's username can't be parameterized independently of it. Only the
+  # password is a real secret; the container is destroyed at the end of every job regardless.
+  PGPASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+  CI_POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: python:3.11-slim
+    services:
+      db:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd "pg_isready -U admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      # git must exist before actions/checkout runs: the container image (python:3.11-slim)
+      # has no git preinstalled, and without it actions/checkout silently falls back to
+      # downloading the repo via the GitHub REST API instead of a real `git clone` -- which
+      # leaves no .git directory at all. Every later git command (ours, and pre-commit's
+      # internal ones) then fails with a generic "are you in a git repository?" error that looks
+      # identical to a dubious-ownership problem but isn't -- there's simply no repo yet.
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends git
+
+      - uses: actions/checkout@v4
+
+      - name: Mark workspace as a safe git directory
+        # Belt-and-suspenders: container jobs can also check the repo out under a different UID
+        # than git runs as inside the container, which git treats as "dubious ownership" and
+        # refuses to touch (CVE-2022-24765 hardening). Cheap to set even if checkout already
+        # handles it.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install remaining system + Python dependencies
+        run: |
+          apt-get install -y --no-install-recommends postgresql-client
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: Load raw data
+        # Reuses init.sql + raw_data/load_data.sh completely unmodified -- these are the exact
+        # same scripts used locally, off-limits to edit. load_data.sh already waits for Postgres
+        # itself, so no separate readiness step is needed here. PGPASSWORD comes from the
+        # workflow-level env above.
+        run: |
+          psql -h db -U admin -d postgres -f init.sql
+          bash raw_data/load_data.sh
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: Lint + contribution checks
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Fetch reference state (last known-good main build)
+        id: fetch_state
+        continue-on-error: true
+        run: |
+          git fetch origin dbt-ci-state
+          mkdir -p prod-state
+          git show origin/dbt-ci-state:manifest.json > prod-state/manifest.json
+
+      - name: dbt build -- changed models + downstream only, deferred upstream
+        if: steps.fetch_state.outcome == 'success'
+        run: >
+          dbt build --target ci
+          --select "state:modified+"
+          --defer --state ./prod-state
+
+      - name: dbt build -- full (no reference state published yet)
+        if: steps.fetch_state.outcome != 'success'
+        run: dbt build --target ci
