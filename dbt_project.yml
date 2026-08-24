@@ -35,6 +35,13 @@ models:
     +schema: pipedrive_analytics
     +materialized: table
 
+    staging:
+      # Views: cheap, always fresh, and the universal dbt convention for a thin pass-through
+      # layer. Isolated to its own schema so consumers browsing schemas land on marts, not
+      # internal staging views.
+      +schema: staging
+      +materialized: view
+
   # Installed packages are NOT covered by the +schema config above (that only scopes to this
   # project's own models), so without this they'd fall back to the default target schema
   # (`public`) and land next to the raw source tables. dbt_project_evaluator's diagnostic
