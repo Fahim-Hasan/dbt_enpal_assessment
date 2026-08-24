@@ -46,6 +46,13 @@ jobs:
           apt-get install -y --no-install-recommends postgresql-client git
           pip install --no-cache-dir -r requirements.txt
 
+      - name: Mark workspace as a safe git directory
+        # Container jobs check the repo out with a different UID than the one git runs as
+        # inside the container, which git treats as "dubious ownership" and refuses to touch
+        # (CVE-2022-24765 hardening) -- pre-commit shells out to git internally regardless of
+        # which hooks are configured, so it fails immediately without this.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Load raw data
         # Reuses init.sql + raw_data/load_data.sh completely unmodified -- these are the exact
         # same scripts used locally, off-limits to edit. load_data.sh already waits for Postgres

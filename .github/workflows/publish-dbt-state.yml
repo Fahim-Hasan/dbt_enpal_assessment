@@ -47,6 +47,12 @@ jobs:
           apt-get install -y --no-install-recommends postgresql-client git
           pip install --no-cache-dir -r requirements.txt
 
+      - name: Mark workspace as a safe git directory
+        # Same fix as ci.yml -- container jobs check the repo out with a different UID than the
+        # one git runs as inside the container ("dubious ownership", CVE-2022-24765 hardening).
+        # This job does git checkout --orphan/push below, which needs it too.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Load raw data
         # PGPASSWORD comes from the workflow-level env above.
         run: |
