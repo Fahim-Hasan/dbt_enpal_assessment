@@ -70,6 +70,9 @@ jobs:
         run: dbt build --target ci
 
       - name: Publish manifest.json as the new reference state
+        # Container jobs here default to `sh` (dash), not bash -- ${GITHUB_SHA::7} is bash-only
+        # substring syntax and fails under dash with "Bad substitution". `cut` is POSIX and
+        # works under either shell.
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -78,5 +81,5 @@ jobs:
           git reset --hard
           cp /tmp/manifest.json manifest.json
           git add manifest.json
-          git commit -m "dbt state as of ${GITHUB_SHA::7}"
+          git commit -m "dbt state as of $(echo "$GITHUB_SHA" | cut -c1-7)"
           git push origin dbt-ci-state-new:dbt-ci-state --force
