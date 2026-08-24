@@ -34,6 +34,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      data_loader:
+        # Without this, `dbt build` can race data_loader and run against still-empty raw
+        # tables -- matters most for automation (dev container postCreateCommand, CI) that
+        # builds immediately on startup rather than a human waiting to run commands by hand.
+        condition: service_completed_successfully
     volumes:
       - .:/usr/app
     environment:

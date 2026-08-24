@@ -12,4 +12,20 @@ enpal_assessment_project:
       threads: 4
       type: postgres
       user: admin
+
+    # CI runs inside a GitHub Actions job `container:`, where service containers are reachable
+    # by service name (not localhost) -- see .github/workflows/. Isolated `ci` base schema keeps
+    # CI builds visibly separate from `dev`, even though each CI run already gets a fresh,
+    # ephemeral Postgres instance with nothing else in it.
+    ci:
+      dbname: postgres
+      host: db
+      # No default here (unlike dev's hardcoded local-only password) -- CI_POSTGRES_PASSWORD is
+      # supplied via a GitHub Actions secret, set as a job-level env var in .github/workflows/.
+      pass: "{{ env_var('CI_POSTGRES_PASSWORD') }}"
+      port: 5432
+      schema: ci
+      threads: 4
+      type: postgres
+      user: admin
   target: dev

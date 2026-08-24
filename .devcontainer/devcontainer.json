@@ -1,0 +1,29 @@
+{
+  "name": "Enpal dbt Assessment",
+  // Reuses the existing docker-compose.yml/Dockerfile rather than defining a separate container
+  // -- opening this in a Dev Container starts the same db + data_loader + dbt services as
+  // `docker compose up`, just with VS Code attached directly inside the `dbt` service so
+  // commands like `dbt build` work with no `docker compose exec dbt` prefix needed.
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "dbt",
+  "workspaceFolder": "/usr/app",
+  "shutdownAction": "stopCompose",
+
+  // Runs once, automatically, the first time the container is created. Serves both target users
+  // of this repo: `dbt deps && dbt build` is what makes the basic-user flow work at all (a
+  // non-technical user just wants the funnel report -- models must already be built before a
+  // single MetricFlow query can return anything). `pre-commit install` is purely for the
+  // developer flow -- it closes the "hooks configured but never actually installed" gap, wiring
+  // a working git hook with zero manual steps -- but is harmless for a basic user to have too;
+  // they simply won't be committing code that triggers it.
+  "postCreateCommand": "dbt deps && pre-commit install && dbt build --select enpal_assessment_project",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "innoverio.vscode-dbt-power-user"
+      ]
+    }
+  }
+}
