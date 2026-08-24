@@ -1,0 +1,161 @@
+version: 2
+
+models:
+  - name: stg_pipedrive__stages
+    description: >
+      One row represents one pipeline stage. Static reference data, matches the 9 numbered
+      funnel steps in the assessment brief 1:1 (source wording may differ slightly in casing
+      from the brief's exact step names -- see stage_name).
+    columns:
+      - name: stage_id
+        description: Pipeline stage identifier, 1-9.
+        data_tests:
+          - unique
+          - not_null
+      - name: stage_name
+        description: Human-readable stage name (raw source wording).
+        data_tests:
+          - not_null
+
+  - name: stg_pipedrive__activity_types
+    description: One row represents one activity type definition.
+    columns:
+      - name: activity_type_id
+        description: Surrogate id for the activity type definition.
+        data_tests:
+          - unique
+          - not_null
+      - name: activity_type_name
+        description: >
+          Human-readable activity type name. "Sales Call 1" and "Sales Call 2" are the two
+          values referenced by the funnel's sub-steps 2.1/3.1.
+        data_tests:
+          - not_null
+      - name: activity_type_code
+        description: The activity type code used elsewhere (stg_pipedrive__activity.activity_type_code).
+        data_tests:
+          - unique
+          - not_null
+      - name: is_active
+        description: Whether the activity type is currently active in Pipedrive.
+
+  - name: stg_pipedrive__users
+    description: One row represents one Pipedrive/CRM user (sales rep).
+    columns:
+      - name: user_id
+        description: >
+          User identifier. Referenced by stg_pipedrive__activity.assigned_to_user_id and by
+          stg_pipedrive__deal_changes.new_value where changed_field_key = 'user_id'.
+        data_tests:
+          - unique
+          - not_null
+      - name: user_name
+        description: User's full name.
+        data_tests:
+          - not_null
+      - name: user_email
+        description: User's email address.
+      - name: user_modified_at
+        description: Timestamp this user record was last modified in the source system.
+
+  - name: stg_pipedrive__activity
+    description: >
+      One row represents one logged sales activity (task/call/etc.) record. activity_id is NOT
+      asserted unique -- a small number of activity_ids collide across two completely unrelated
+      activities (different type, user, deal, and timestamp), consistent with an ID-collision
+      artifact in how this dataset was generated rather than a real duplicate insert (see
+      CLAUDE.md finding 1/3). Most deal_id values here do not correspond to any deal_id with a
+      creation event in stg_pipedrive__deal_changes -- this is a genuine, documented gap in the
+      source extract, not a join-key formatting issue (see CLAUDE.md finding 1).
+    columns:
+      - name: activity_id
+        description: >
+          Intended identifier for the activity. Deliberately not tested as unique -- it
+          genuinely isn't, for reasons documented at the model level above.
+      - name: activity_type_code
+        description: >
+          Activity type code. Joins to stg_pipedrive__activity_types.activity_type_code --
+          referential integrity for this join is asserted wherever the join is actually used,
+          not here (staging tests stay scoped to what one table can assert about itself).
+        data_tests:
+          - not_null
+      - name: assigned_to_user_id
+        description: >
+          The CRM user (sales rep) the activity is assigned to. Joins to
+          stg_pipedrive__users.user_id -- see note on activity_type_code above.
+      - name: deal_id
+        description: >
+          Intended FK to a deal. Frequently does not match any deal_id with a creation event in
+          stg_pipedrive__deal_changes -- see model-level description. Not tested with a
+          relationships test against deal_changes for this reason (it's expected to fail for
+          most rows, so asserting it would just be a permanently-red, uninformative test).
+        data_tests:
+          - not_null
+      - name: is_done
+        description: Whether the activity has been completed.
+        data_tests:
+          - not_null
+      - name: due_at
+        description: Timestamp the activity is/was due.
+
+  - name: stg_pipedrive__deal_changes
+    description: >
+      One row represents one field-change event: one field changed on one deal at one point in
+      time. This is an append-only audit log, not a snapshot -- there is no standalone deals
+      table; deal state must be reconstructed from this log (see the intermediate layer). Five
+      deal_ids are known to contain two unrelated deals' histories collided onto the same id
+      (see CLAUDE.md finding 2) -- not repaired here; excluded explicitly in the intermediate
+      layer.
+    columns:
+      - name: deal_id
+        description: >
+          Intended identifier for the deal this event belongs to. Not unique (this is an event
+          log, one deal has many events) and not reliably 1:1 with a single real-world deal for
+          five specific ids -- see model-level description.
+        data_tests:
+          - not_null
+      - name: changed_at
+        description: Timestamp the change was recorded.
+        data_tests:
+          - not_null
+      - name: changed_field_key
+        description: >
+          Which field changed. add_time = deal creation event. stage_id = pipeline stage
+          transition (new_value joins to stg_pipedrive__stages.stage_id). user_id = deal owner
+          reassignment (new_value joins to stg_pipedrive__users.user_id). lost_reason = deal
+          marked lost (new_value joins to stg_pipedrive__lost_reasons.lost_reason_id).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['add_time', 'stage_id', 'user_id', 'lost_reason']
+      - name: new_value
+        description: >
+          The new value for changed_field_key, stored as untyped text -- meaning and real type
+          depend entirely on changed_field_key. Typed/interpreted per-field in the intermediate
+          layer, not here.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - deal_id
+              - changed_at
+              - changed_field_key
+
+  - name: stg_pipedrive__lost_reasons
+    description: >
+      One row represents one lost-reason option a deal can be tagged with when marked lost.
+      Extracted from the lost_reason field's option list in the pipedrive.fields source (JSON
+      array unpacked into a flat lookup, shaped like stg_pipedrive__stages).
+    columns:
+      - name: lost_reason_id
+        description: >
+          Lost reason option identifier. Referenced by stg_pipedrive__deal_changes.new_value
+          where changed_field_key = 'lost_reason'.
+        data_tests:
+          - unique
+          - not_null
+      - name: lost_reason_name
+        description: Human-readable lost reason label.
+        data_tests:
+          - not_null

@@ -1,0 +1,126 @@
+version: 2
+
+sources:
+  - name: pipedrive
+    description: >
+      Raw extract from Pipedrive CRM (the sales pipeline tool). Loaded as-is from
+      raw_data/*.csv via raw_data/load_data.sh into Postgres, with no transformation on load.
+      deal_changes is an append-only field-change audit log, not a snapshot table -- there is
+      no standalone "deals" table; a deal's current state must be reconstructed from this log
+      (see the intermediate layer). Known source-data-quality issues are documented at the
+      table/column level below rather than silently handled.
+    database: postgres
+    schema: public
+    tables:
+      - name: activity
+        description: >
+          One row per logged sales activity (task/call), as recorded against a deal.
+          `activity_id` is NOT reliably unique -- see the activity_id column note. Most
+          `deal_id` values here do not correspond to any deal_id present in deal_changes
+          (the majority of activities reference deals with no creation/stage history at all);
+          this is a genuine gap in the source extract, not a join-key formatting issue.
+        columns:
+          - name: activity_id
+            description: >
+              Intended identifier for the activity. NOT asserted unique: a small number of
+              activity_ids collide across two completely unrelated activities (different type,
+              user, deal, and timestamp) -- e.g. activity_id 521731 has two distinct rows with
+              no shared attributes besides the id. Consistent with an ID-collision artifact in
+              how this (likely synthetic) dataset was generated, not a real duplicate insert.
+          - name: type
+            description: Activity type code. Joins to activity_types.type for the human name.
+          - name: assigned_to_user
+            description: The CRM user (sales rep) the activity is assigned to. Joins to users.id.
+          - name: deal_id
+            description: >
+              Intended FK to a deal. Frequently does not match any deal_id that has a
+              corresponding add_time event in deal_changes (see source-level description).
+          - name: done
+            description: Whether the activity has been completed.
+          - name: due_to
+            description: Timestamp the activity is/was due.
+
+      - name: activity_types
+        description: Reference table mapping an activity type code to its human-readable name.
+        columns:
+          - name: id
+            description: Surrogate id for the activity type definition.
+          - name: name
+            description: >
+              Human-readable activity type name, e.g. "Sales Call 1", "Sales Call 2". These two
+              specific values are the activities referenced by the funnel's sub-steps 2.1/3.1.
+          - name: active
+            description: Whether the activity type is currently active in Pipedrive ("Yes"/"No").
+          - name: type
+            description: The activity type code used elsewhere (activity.type).
+
+      - name: deal_changes
+        description: >
+          Append-only field-change event log. One row = one field changed on one deal at one
+          point in time. This is the only source of deal lifecycle/state -- there is no
+          standalone deals table. changed_field_key determines how to interpret new_value (see
+          column note). A small number of deal_ids (five, at last check) have two unrelated
+          add_time events with distinct, internally-consistent time-of-day signatures on every
+          subsequent event -- strong evidence that two unrelated deals collided onto the same
+          deal_id in this dataset, not a duplicate creation event for one real deal. These are
+          not repaired here (see intermediate layer for the exclusion decision).
+        columns:
+          - name: deal_id
+            description: >
+              Intended identifier for the deal this event belongs to. Not reliably 1:1 with a
+              single real-world deal for a small number of ids -- see table-level description.
+          - name: change_time
+            description: Timestamp the change was recorded, `YYYY-MM-DD HH:MM:SS`.
+          - name: changed_field_key
+            description: >
+              Which field changed. One of: add_time (deal creation event), stage_id (pipeline
+              stage transition, new_value joins to stages.stage_id), user_id (deal owner
+              reassignment, new_value joins to users.id), lost_reason (deal marked lost,
+              new_value is an option id described in fields.FIELD_VALUE_OPTIONS).
+          - name: new_value
+            description: >
+              The new value for changed_field_key, stored as untyped text. Meaning depends
+              entirely on changed_field_key -- see that column's description.
+
+      - name: fields
+        description: >
+          Custom-field metadata for deal_changes.changed_field_key. FIELD_VALUE_OPTIONS decodes
+          the numeric option ids used as new_value for stage_id (mirrors the stages table) and
+          lost_reason.
+        columns:
+          - name: id
+            description: Surrogate id for the field definition.
+          - name: field_key
+            description: Matches deal_changes.changed_field_key.
+          - name: name
+            description: Human-readable field name.
+          - name: field_value_options
+            description: >
+              JSON array of {id, label} option pairs for fields with a fixed option set
+              (stage_id, lost_reason). Null for free-text/date fields (add_time, user_id).
+
+      - name: stages
+        description: >
+          Reference table of the 9 Pipedrive pipeline stages, matching the 9 numbered funnel
+          steps in the assessment brief 1:1. stage_name wording differs slightly in casing from
+          the brief's exact step names (e.g. "Qualified lead" vs. "Qualified Lead") -- treat
+          this as the raw source label; prefer the brief's wording in business-facing output.
+        columns:
+          - name: stage_id
+            description: Pipeline stage identifier, 1-9. Referenced by deal_changes.new_value
+              where changed_field_key = 'stage_id'.
+          - name: stage_name
+            description: Human-readable stage name (raw source wording).
+
+      - name: users
+        description: One row per Pipedrive/CRM user (sales rep).
+        columns:
+          - name: id
+            description: User identifier. Referenced by activity.assigned_to_user and
+              deal_changes.new_value where changed_field_key = 'user_id'.
+          - name: name
+            description: User's full name.
+          - name: email
+            description: User's email address.
+          - name: modified
+            description: Timestamp this user record was last modified in the source system.
