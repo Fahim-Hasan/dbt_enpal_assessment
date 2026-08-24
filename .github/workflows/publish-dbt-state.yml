@@ -39,19 +39,23 @@ jobs:
           --health-retries 10
 
     steps:
+      # git must exist before actions/checkout runs -- see ci.yml for why (no git preinstalled
+      # in python:3.11-slim means checkout falls back to a non-git API download with no .git
+      # directory at all).
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends git
+
       - uses: actions/checkout@v4
 
-      - name: Install system + Python dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends postgresql-client git
-          pip install --no-cache-dir -r requirements.txt
-
       - name: Mark workspace as a safe git directory
-        # Same fix as ci.yml -- container jobs check the repo out with a different UID than the
-        # one git runs as inside the container ("dubious ownership", CVE-2022-24765 hardening).
-        # This job does git checkout --orphan/push below, which needs it too.
+        # Belt-and-suspenders, see ci.yml -- this job does git checkout --orphan/push below,
+        # which needs a real repo either way.
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install remaining system + Python dependencies
+        run: |
+          apt-get install -y --no-install-recommends postgresql-client
+          pip install --no-cache-dir -r requirements.txt
 
       - name: Load raw data
         # PGPASSWORD comes from the workflow-level env above.

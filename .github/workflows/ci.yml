@@ -38,20 +38,28 @@ jobs:
           --health-retries 10
 
     steps:
+      # git must exist before actions/checkout runs: the container image (python:3.11-slim)
+      # has no git preinstalled, and without it actions/checkout silently falls back to
+      # downloading the repo via the GitHub REST API instead of a real `git clone` -- which
+      # leaves no .git directory at all. Every later git command (ours, and pre-commit's
+      # internal ones) then fails with a generic "are you in a git repository?" error that looks
+      # identical to a dubious-ownership problem but isn't -- there's simply no repo yet.
+      - name: Install git
+        run: apt-get update && apt-get install -y --no-install-recommends git
+
       - uses: actions/checkout@v4
 
-      - name: Install system + Python dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends postgresql-client git
-          pip install --no-cache-dir -r requirements.txt
-
       - name: Mark workspace as a safe git directory
-        # Container jobs check the repo out with a different UID than the one git runs as
-        # inside the container, which git treats as "dubious ownership" and refuses to touch
-        # (CVE-2022-24765 hardening) -- pre-commit shells out to git internally regardless of
-        # which hooks are configured, so it fails immediately without this.
+        # Belt-and-suspenders: container jobs can also check the repo out under a different UID
+        # than git runs as inside the container, which git treats as "dubious ownership" and
+        # refuses to touch (CVE-2022-24765 hardening). Cheap to set even if checkout already
+        # handles it.
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install remaining system + Python dependencies
+        run: |
+          apt-get install -y --no-install-recommends postgresql-client
+          pip install --no-cache-dir -r requirements.txt
 
       - name: Load raw data
         # Reuses init.sql + raw_data/load_data.sh completely unmodified -- these are the exact

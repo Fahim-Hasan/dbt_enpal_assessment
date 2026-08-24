@@ -19,18 +19,27 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
 
+  # language: system here: sqlfluff-templater-dbt/dbt-postgres are already pinned in
+  # requirements.txt and installed system-wide in this project's one controlled environment (the
+  # `dbt` container, locally and in CI) -- additional_dependencies would just reinstall
+  # dbt-postgres redundantly and create a second place its version could drift from
+  # requirements.txt. Isolation is what additional_dependencies buys you on an arbitrary
+  # contributor machine; this repo never runs pre-commit outside its own image.
   - repo: https://github.com/sqlfluff/sqlfluff
     rev: 4.3.0
     hooks:
       - id: sqlfluff-lint
         files: ^models/.*\.sql$
-        additional_dependencies:
-          - dbt-postgres==1.11.0
-          - sqlfluff-templater-dbt==4.3.0
+        language: system
 
   # dbt-checkpoint: per-model/source contribution checks, run against a freshly-parsed
   # manifest (dbt-parse must run first in this same pass). dbt-parse is a static metadata
   # parse, not a compile/run, so it doesn't require a live Postgres connection.
+  # NOT language: system, unlike sqlfluff-lint above -- dbt-checkpoint has no PyPI release under
+  # any safe name (its own setup.cfg declares package name `pre_commit_hooks`, colliding with
+  # the unrelated, real pre-commit-hooks project used above) so it can't be added to
+  # requirements.txt cleanly. additional_dependencies here still only needs dbt-postgres, not the
+  # full toolchain, so the redundancy this avoids elsewhere is much smaller.
   - repo: https://github.com/dbt-checkpoint/dbt-checkpoint
     rev: v2.0.10
     hooks:
