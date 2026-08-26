@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: fct_deals__funnel
+    description: >
+      One row represents one deal reaching one funnel step at a specific timestamp. Grain is
+      (deal_id, funnel_step, event_date). Excludes sub-step events flagged by
+      macros/get_invalid_substep_events.sql (activity-derived events that couldn't have
+      genuinely happened at the claimed step).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - deal_id
+              - funnel_step
+              - event_date
+    columns:
+      - name: deal_id
+        description: The deal that reached this funnel step.
+        data_tests:
+          - not_null
+      - name: funnel_step
+        description: >
+          Ordinal step code, joins to dim_deals__funnel_steps.funnel_step. The only safe join
+          key -- bare stage_id is not exposed on this table on purpose.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_deals__funnel_steps')
+                field: funnel_step
+      - name: event_date
+        description: Timestamp the deal reached this funnel step.
+        data_tests:
+          - not_null

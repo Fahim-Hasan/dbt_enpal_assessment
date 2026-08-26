@@ -42,6 +42,12 @@ models:
       +schema: staging
       +materialized: view
 
+    intermediate:
+      # Internal plumbing between staging and marts -- isolated to its own schema so it doesn't
+      # land next to consumer-facing marts, same reasoning as staging above.
+      +schema: intermediate
+      +materialized: view
+
   # Installed packages are NOT covered by the +schema config above (that only scopes to this
   # project's own models), so without this they'd fall back to the default target schema
   # (`public`) and land next to the raw source tables. dbt_project_evaluator's diagnostic

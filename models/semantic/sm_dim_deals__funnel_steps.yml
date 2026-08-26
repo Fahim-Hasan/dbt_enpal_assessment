@@ -1,0 +1,16 @@
+semantic_models:
+  - name: dim_deals_funnel_steps
+    description: >
+      One row represents one funnel step -- the 9 pipeline stages plus the 2 activity-derived
+      sub-steps. Semantic layer wrapper around dim_deals__funnel_steps, joined to
+      fct_deals__funnel via the funnel_step entity.
+    model: ref('dim_deals__funnel_steps')
+
+    entities:
+      - name: funnel_step
+        type: primary
+        expr: funnel_step
+
+    dimensions:
+      - name: kpi_name
+        type: categorical

@@ -1,0 +1,31 @@
+semantic_models:
+  - name: fct_deals_funnel
+    description: >
+      One row represents one deal reaching one funnel step at a point in time. Semantic layer
+      wrapper around the fct_deals__funnel fact table.
+    model: ref('fct_deals__funnel')
+    defaults:
+      agg_time_dimension: event_date
+
+    entities:
+      - name: funnel_event
+        type: primary
+        expr: "deal_id::text || '-' || funnel_step || '-' || event_date::text"
+      - name: deal
+        type: foreign
+        expr: deal_id
+      - name: funnel_step
+        type: foreign
+        expr: funnel_step
+
+    dimensions:
+      - name: event_date
+        type: time
+        type_params:
+          time_granularity: day
+
+    measures:
+      - name: deals_count
+        description: Distinct count of deals that reached a funnel step.
+        agg: count_distinct
+        expr: deal_id

@@ -2,13 +2,22 @@ with source as (
     select * from {{ source('pipedrive', 'activity_types') }}
 ),
 
-renamed as (
+transformed as (
     select
         id as activity_type_id,
-        name as activity_type_name,
-        type as activity_type_code,
-        (active = 'Yes') as is_active
+        upper(replace(name, ' ', '_')) as activity_type_name,
+        upper(replace(type, ' ', '_')) as activity_type_code,
+        (upper(active) = 'YES') as is_active
     from source
+),
+
+final as (
+    select
+        activity_type_id,
+        activity_type_name,
+        activity_type_code,
+        is_active
+    from transformed
 )
 
-select * from renamed
+select * from final

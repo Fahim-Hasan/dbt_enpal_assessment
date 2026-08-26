@@ -2,11 +2,18 @@ with source as (
     select * from {{ source('pipedrive', 'stages') }}
 ),
 
-renamed as (
+transformed as (
+    select
+        stage_id,
+        upper(replace(stage_name, ' ', '_')) as stage_name
+    from source
+),
+
+final as (
     select
         stage_id,
         stage_name
-    from source
+    from transformed
 )
 
-select * from renamed
+select * from final

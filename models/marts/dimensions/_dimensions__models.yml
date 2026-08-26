@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: dim_dates
+    description: >
+      One row represents one calendar day, spanning the full observed activity window in the
+      source data (see int_pipedrive__date_spine for exact bounds). Passthrough of the date
+      spine plus calendar attributes. month_start_date is a convenience column for month-level
+      grouping/joins (the first day of the month containing date_day) -- facts are NOT
+      pre-aggregated to month; month-level reporting happens by truncating/grouping at query or
+      semantic-layer time. Registered as the MetricFlow time spine (see date_day) so metric
+      queries can fill in months with zero activity instead of silently omitting them.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: The calendar date for this row. Grain of this table.
+        granularity: day
+        data_tests:
+          - unique
+          - not_null
+      - name: calendar_year
+        description: Calendar year of date_day.
+      - name: month_number
+        description: Calendar month number (1-12) of date_day.
+      - name: month_start_date
+        description: The first day of the month containing date_day (e.g. 2024-09-08 -> 2024-09-01).
+      - name: day_of_month
+        description: Day of the month (1-31).
+      - name: day_of_week
+        description: ISO day of week (1=Monday .. 7=Sunday).
+      - name: day_name
+        description: Full day name (e.g. "Monday"), padded per Postgres to_char behavior.
+  - name: dim_deals__funnel_steps
+    description: >
+      One row represents one funnel step -- the 9 Pipedrive pipeline stages plus the 2
+      activity-derived sub-steps (2.1 Sales Call 1, 3.1 Sales Call 2). funnel_step is resolved via
+      macros/get_funnel_step_from_code.sql, the same mapping used to build fct_deals__funnel --
+      join on funnel_step only.
+    columns:
+      - name: funnel_step
+        description: Ordinal step code (e.g. '1', '2.1'). Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: kpi_name
+        description: Business label for the step, from stages/activity_types.
+        data_tests:
+          - not_null
+  - name: dim_users
+    description: >
+      One row represents one Pipedrive/CRM user (sales rep). Direct passthrough of
+      stg_pipedrive__users -- not currently joined by any fact table.
+    columns:
+      - name: user_id
+        description: User identifier. Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: user_name
+        description: User's full name.
+      - name: user_email
+        description: User's email address.
+      - name: user_modified_at
+        description: Timestamp this user record was last modified in the source system.
+  - name: dim_deals__lost_reasons
+    description: >
+      One row represents one lost-reason option a deal can be tagged with when marked lost.
+      Direct passthrough of stg_pipedrive__lost_reasons -- no transformation. Not currently
+      joined by any fact table.
+    columns:
+      - name: lost_reason_id
+        description: Lost reason option identifier. Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: lost_reason_name
+        description: Lost reason label, canonical form (e.g. 'CUSTOMER_NOT_READY') -- not human-readable display text.
+        data_tests:
+          - not_null

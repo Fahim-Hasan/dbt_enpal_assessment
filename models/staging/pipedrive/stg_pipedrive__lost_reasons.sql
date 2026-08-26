@@ -17,11 +17,18 @@ unnested as (
         jsonb_array_elements(lost_reason_field.field_value_options) as lost_reason_option
 ),
 
-renamed as (
+transformed as (
     select
         (lost_reason_option ->> 'id')::int as lost_reason_id,
-        lost_reason_option ->> 'label' as lost_reason_name
+        upper(replace(lost_reason_option ->> 'label', ' ', '_')) as lost_reason_name
     from unnested
+),
+
+final as (
+    select
+        lost_reason_id,
+        lost_reason_name
+    from transformed
 )
 
-select * from renamed
+select * from final
