@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: int_pipedrive__general_activity
+    description: >
+      One row represents one follow_up/after_close_call activity. Complete, unfiltered
+      passthrough of stg_pipedrive__activity where activity_type_code in ('FOLLOW_UP',
+      'AFTER_CLOSE_CALL') -- deliberately not checked for deal-linkage reliability (unlike the
+      funnel's sales-call sub-steps): this fact is a scope demonstration, kept simple by design.
+    columns:
+      - name: deal_id
+        description: Intended FK to a deal -- not reliably linked to deal_changes, same caveat as elsewhere in this project.
+        data_tests:
+          - not_null
+      - name: activity_type
+        description: Resolved via get_activity_type_from_code. 'FOLLOW_UP_CALL' or 'AFTER_CLOSE_CALL'.
+        data_tests:
+          - not_null
+      - name: user_id
+        description: The CRM user (sales rep) the activity is assigned to. Always populated for this source.
+        data_tests:
+          - not_null
+      - name: event_date
+        description: The activity's due/occurrence timestamp.
+        data_tests:
+          - not_null
+
+  - name: int_pipedrive__deal_change_activity
+    description: >
+      One row represents one add_time or user_id change event from the deal_changes audit log.
+      Complete, unfiltered passthrough of stg_pipedrive__deal_changes where changed_field_key in
+      ('ADD_TIME', 'USER_ID').
+    columns:
+      - name: deal_id
+        description: The deal this event belongs to.
+        data_tests:
+          - not_null
+      - name: activity_type
+        description: Resolved via get_activity_type_from_code. 'DEAL_CREATED' or 'OWNER_CHANGED'.
+        data_tests:
+          - not_null
+      - name: user_id
+        description: >
+          The new owner, only for OWNER_CHANGED rows -- null for DEAL_CREATED, since add_time's
+          new_value holds a timestamp, not a user id.
+      - name: event_date
+        description: Timestamp the change was recorded.
+        data_tests:
+          - not_null
+
+  - name: int_deals_activity_unioned
+    description: >
+      One row represents one general-activity event for a deal (follow-up/close call, deal
+      creation, or owner change) at one point in time. Raw union of int_pipedrive__general_activity
+      and int_pipedrive__deal_change_activity -- no validity filtering, matches
+      int_deals_funnel_unioned's convention.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - deal_id
+              - activity_type
+              - event_date

@@ -1,9 +1,16 @@
 name: CI
 
-# Slim CI: only builds/tests models affected by this PR (state:modified+), deferring everything
-# else to the most recent successful main-branch build instead of rebuilding the whole project
-# or leaving upstream models stale. See .github/workflows/publish-dbt-state.yml for how the
-# reference state gets produced.
+# Slim CI: builds/tests only what's actually needed for this PR -- the changed nodes
+# (state:modified, diffed against the manifest published by publish-dbt-state.yml), their
+# ancestors, and their descendants (+state:modified+). No --defer: this project's CI Postgres is
+# destroyed and recreated on every single job, so a deferred node's *data* (not just the manifest
+# describing where it lives) would have to survive across separate ephemeral containers, which it
+# can't -- confirmed in practice, not just in theory, the first time a PR left something genuinely
+# unmodified that a new model still depended on. Including ancestors (+state:modified) instead
+# means every node this run actually needs gets built fresh, right here, from the real loaded
+# data, with no cross-run persistence assumption at all. In a real deployment with a persistent
+# prod warehouse, --defer against it would be the correct, faster version of this -- see
+# CLAUDE.md's parked production-grade work for that path.
 
 on:
   pull_request:
@@ -84,12 +91,17 @@ jobs:
           mkdir -p prod-state
           git show origin/dbt-ci-state:manifest.json > prod-state/manifest.json
 
-      - name: dbt build -- changed models + downstream only, deferred upstream
+      - name: dbt build -- changed models, their ancestors, and their descendants
+        # Scoped to package:enpal_assessment_project -- dbt_project_evaluator's own models show
+        # as "modified" against an identical reference manifest on every single parse (a package
+        # quirk, verified present even before this selector existed; unrelated to our project's
+        # state). Without the scope, CI would build the entire audit suite on every PR, which
+        # dbt_project_evaluator is explicitly meant to run on demand only, not routinely.
         if: steps.fetch_state.outcome == 'success'
         run: >
           dbt build --target ci
-          --select "state:modified+"
-          --defer --state ./prod-state
+          --select "+state:modified+,package:enpal_assessment_project"
+          --state ./prod-state
 
       - name: dbt build -- full (no reference state published yet)
         if: steps.fetch_state.outcome != 'success'

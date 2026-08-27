@@ -47,10 +47,26 @@ models:
         description: Business label for the step, from stages/activity_types.
         data_tests:
           - not_null
+  - name: dim_activity_types
+    description: >
+      One row represents one general-activity type (follow-up/close call, deal creation, owner
+      change) -- the 4 types behind fct_deals__activity, resolved via
+      macros/get_activity_type_from_code.sql, the same mapping used to build the fact. Single
+      column by design: unlike dim_deals__funnel_steps, there's no separate source-driven label
+      distinct from the resolved code for these 4 types, so activity_type serves as both the
+      join key and the display value.
+    columns:
+      - name: activity_type
+        description: >
+          Resolved activity type ('FOLLOW_UP_CALL', 'AFTER_CLOSE_CALL', 'DEAL_CREATED',
+          'OWNER_CHANGED'). Grain of this table.
+        data_tests:
+          - unique
+          - not_null
   - name: dim_users
     description: >
       One row represents one Pipedrive/CRM user (sales rep). Direct passthrough of
-      stg_pipedrive__users -- not currently joined by any fact table.
+      stg_pipedrive__users. Joined by fct_deals__activity.user_id.
     columns:
       - name: user_id
         description: User identifier. Grain of this table.
@@ -66,8 +82,8 @@ models:
   - name: dim_deals__lost_reasons
     description: >
       One row represents one lost-reason option a deal can be tagged with when marked lost.
-      Direct passthrough of stg_pipedrive__lost_reasons -- no transformation. Not currently
-      joined by any fact table.
+      Direct passthrough of stg_pipedrive__lost_reasons -- no transformation. Joined by
+      fct_deals__latest_snapshot.lost_reason_id.
     columns:
       - name: lost_reason_id
         description: Lost reason option identifier. Grain of this table.

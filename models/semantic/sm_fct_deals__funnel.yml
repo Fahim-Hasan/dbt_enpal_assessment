@@ -10,7 +10,7 @@ semantic_models:
     entities:
       - name: funnel_event
         type: primary
-        expr: "deal_id::text || '-' || funnel_step || '-' || event_date::text"
+        expr: funnel_event_id
       - name: deal
         type: foreign
         expr: deal_id
