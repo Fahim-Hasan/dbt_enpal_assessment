@@ -68,6 +68,23 @@ You can also just open a terminal in this project and run `claude`, then ask dir
 (`.claude/skills/sales-funnel-monthly/`) answers using this same semantic layer, scoped only to
 sales funnel questions.
 
+## Before you read these numbers — what they don't tell you
+
+- **Reaching a stage is not the same as winning the deal.** This data can tell us a deal reached
+  a certain point in the pipeline, but there's no way to tell from it whether a deal was ever
+  actually won — only whether it was later marked lost. A high number at "Closing" doesn't mean
+  those deals succeeded.
+- **"Sales Call 1" and "Sales Call 2" always show 0.** Those two numbers would come from a
+  separate log of sales activities, but that log doesn't reliably say which deal each call
+  actually belongs to. Rather than guess, we only count a call when it can be genuinely verified
+  against a real deal — and in this sample, none can be. That's a property of this sample data,
+  not a mistake in the report.
+- **Almost every deal in this sample eventually ends up "lost."** That's an unusually high number
+  for a real business and is most likely a quirk of this being sample/test data, not a real
+  signal about performance.
+- **A month showing 0 for a step means exactly that — 0 deals reached it that month**, not
+  missing or broken data.
+
 ## For developers
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow — running tests and lint, the

@@ -81,9 +81,11 @@ docker compose exec dbt dbt build --select package:dbt_project_evaluator
   (see `macros/get_invalid_substep_events.sql`, `macros/get_colliding_deal_ids.sql`, and the tests
   built on top of them) rather than silently worked around — they document a real characteristic
   of the source data and are expected to stay non-zero, not to eventually "pass by getting fixed."
-- Prefer a real dbt/`dbt_utils`/`dbt_expectations` test over a bespoke singular one when an
-  existing generic test already expresses the check — reach for a new macro-backed generic test
-  only when the logic is genuinely bespoke (e.g. the two above).
+- Prefer a real dbt/`dbt_utils` test over a bespoke singular one when an existing generic test
+  already expresses the check — reach for a new macro-backed generic test only when the logic is
+  genuinely bespoke (e.g. the two above). `dbt_expectations` (statistical/distributional/regex
+  checks beyond dbt_utils) was evaluated and deliberately not adopted for this take-home — noted
+  as production-grade future work rather than left installed and unused.
 - If a test passes locally but fails in CI (or vice versa) for a reason that isn't obviously a
   real data/logic bug, don't just re-add it once "fixed" — see `CLAUDE.md` §17 for a live example
   of this happening and being parked rather than guessed at further.

@@ -3,14 +3,6 @@ packages:
   - package: dbt-labs/dbt_utils
     version: [">=1.4.0", "<2.0.0"]
 
-  # Great-Expectations-style generic tests (distributional/statistical/row-count/type checks)
-  # on top of dbt's native test framework — this is the "great expectations" piece: it ports
-  # GE's assertion vocabulary into dbt-native tests rather than running a separate GE stack.
-  # Using the metaplane fork: the original calogica/dbt_expectations is unmaintained and dbt
-  # emits a PackageRedirectDeprecation warning on `dbt deps` pointing at this fork.
-  - package: metaplane/dbt_expectations
-    version: [">=0.10.0", "<0.11.0"]
-
   # dbt Labs' project-structure linter: flags fanned-out sources, staging models with
   # non-staging logic, undocumented/untested models, naming convention violations, etc.
   # Run via `dbt build --select package:dbt_project_evaluator` — see CONTRIBUTING.md.
