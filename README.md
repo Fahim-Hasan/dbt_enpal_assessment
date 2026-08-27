@@ -1,3 +1,11 @@
+# Pipedrive Sales Funnel Analytics
+
+A dbt project turning a raw Pipedrive CRM export into a certified monthly sales funnel report and
+a MetricFlow semantic layer — sources → staging → intermediate → marts (facts/dimensions) →
+`rep_sales_funnel_monthly`, plus self-service querying via `mf query` or asking Claude directly.
+
+The original assignment requirements are [here](#project-requirements-given).
+
 ## Setup
 
 ### Fastest path — dev container (recommended)
@@ -8,6 +16,7 @@
 3. Reopen in the container when prompted (or run "Dev Containers: Reopen in Container"). This
    automatically starts Postgres, loads the raw data, builds every dbt model, and installs the
    git hooks — no manual steps needed.
+4. Check the logs (It will take little time to setup)
 
 ### Without a dev-container-aware editor
 
@@ -29,6 +38,10 @@ already inside the dev container).
 Each command below has `--start-time 2024-03-01 --end-time 2024-03-31` built in — just edit those
 two dates to whichever month or range you want (they don't have to be the same month; a wider
 range like `--start-time 2024-01-01 --end-time 2024-12-31` shows every month in between).
+
+> **Data only exists from 2024-01-08 to 2025-02-24.** We found this range directly in the source
+> data itself (the earliest and latest recorded deal activity), not chosen by us — asking for
+> dates outside it just returns nothing, since there's nothing there to return.
 
 **1. See the report as a table:**
 ```bash
