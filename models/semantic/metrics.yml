@@ -1,0 +1,9 @@
+metrics:
+  - name: deals_count
+    description: Distinct count of deals reaching a given funnel step, by month.
+    label: Deals Count
+    type: simple
+    type_params:
+      measure:
+        name: deals_count
+        fill_nulls_with: 0

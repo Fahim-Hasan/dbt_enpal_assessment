@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: int_pipedrive__date_spine
+    description: >
+      One row represents one calendar day. Spans every day between the earliest and latest
+      recorded event date across stg_pipedrive__deal_changes.changed_at and
+      stg_pipedrive__activity.due_at (i.e. the full observed activity window in the source data,
+      not just funnel-relevant events) -- built via dbt_utils.date_spine with dynamically
+      computed bounds rather than a hardcoded range. Facts keep their native event-level dates;
+      this spine exists so downstream marts/the semantic layer can report on months with zero
+      activity rather than silently omitting them.
+    columns:
+      - name: date_day
+        description: The calendar date for this row.
+        data_tests:
+          - unique
+          - not_null
