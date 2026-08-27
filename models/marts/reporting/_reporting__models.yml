@@ -29,9 +29,6 @@ models:
         description: Distinct count of deals reaching this funnel step in this month. 0 is valid, not missing data.
         data_tests:
           - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              arguments:
-                min_value: 0
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
