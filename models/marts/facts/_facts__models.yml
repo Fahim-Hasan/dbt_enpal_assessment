@@ -4,17 +4,17 @@ models:
   - name: fct_deals__funnel
     description: >
       One row represents one deal reaching one funnel step at a specific timestamp. Grain is
-      (deal_id, funnel_step, event_date). Excludes sub-step events flagged by
+      (deal_id, funnel_step, event_date), surfaced as the funnel_event_id surrogate key --
+      prep for a future incremental unique_key, not yet switched from table materialization
+      (dataset is too small to justify it today). Excludes sub-step events flagged by
       macros/get_invalid_substep_events.sql (activity-derived events that couldn't have
       genuinely happened at the claimed step).
-    data_tests:
-      - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns:
-              - deal_id
-              - funnel_step
-              - event_date
     columns:
+      - name: funnel_event_id
+        description: Surrogate key, hash of (deal_id, funnel_step, event_date). Grain of this table.
+        data_tests:
+          - unique
+          - not_null
       - name: deal_id
         description: The deal that reached this funnel step.
         data_tests:
@@ -33,3 +33,81 @@ models:
         description: Timestamp the deal reached this funnel step.
         data_tests:
           - not_null
+
+  - name: fct_deals__activity
+    description: >
+      One row represents one general-activity event for a deal (follow-up/close call, deal
+      creation, or owner change) at one point in time. Grain is (deal_id, activity_type,
+      event_date), surfaced as the activity_event_id surrogate key, same prep-for-incremental
+      reasoning as fct_deals__funnel. Unfiltered -- a scope demonstration for the kind of report
+      this project could extend to, not a validated production fact (see model description in
+      the intermediate layer for why no deal-linkage reliability check is applied here).
+    columns:
+      - name: activity_event_id
+        description: Surrogate key, hash of (deal_id, activity_type, event_date). Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: deal_id
+        description: The deal this activity/change event belongs to.
+        data_tests:
+          - not_null
+      - name: activity_type
+        description: Joins to dim_activity_types.activity_type. The only safe join key.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_activity_types')
+                field: activity_type
+      - name: user_id
+        description: >
+          The CRM user tied to this event -- joins to dim_users.user_id. Null for DEAL_CREATED
+          (no user context on deal creation), populated for every other activity_type. Kept for
+          future rep-performance/user-scoped reporting, not consumed by any report yet.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_users')
+                field: user_id
+      - name: event_date
+        description: Timestamp the activity/change event occurred.
+        data_tests:
+          - not_null
+
+  - name: fct_deals__latest_snapshot
+    description: >
+      One row represents one deal's current state: is it lost, and if so why. deal_id is a real
+      natural single-column key here (unlike the other two facts, which need a generated
+      surrogate key) -- no hash needed. Excludes deal_ids flagged by
+      macros/get_colliding_deal_ids.sql (two unrelated deals' histories collided onto one id --
+      a single-row-per-deal snapshot has no safe way to represent two blended truths). No "won"
+      signal exists anywhere in this dataset (see CLAUDE.md), so is_lost stays 2-state -- not
+      inferred from stage, confirmed in a prior investigation that reaching any stage including
+      the final one is no indicator of being won.
+    columns:
+      - name: deal_id
+        description: The deal. Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: created_at
+        description: Timestamp the deal was created.
+        data_tests:
+          - not_null
+      - name: is_lost
+        description: Whether the deal has ever been marked lost. True for every deal in this sample once collisions are excluded (see CLAUDE.md finding on lost rate).
+        data_tests:
+          - not_null
+      - name: lost_reason_id
+        description: >
+          Joins to dim_deals__lost_reasons.lost_reason_id. Null when is_lost is false. The deal's
+          most recent lost_reason event when a deal has more than one (see
+          int_pipedrive__deal_lost_events).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_deals__lost_reasons')
+                field: lost_reason_id
+      - name: lost_at
+        description: Timestamp of the deal's most recent lost_reason event. Null when is_lost is false.

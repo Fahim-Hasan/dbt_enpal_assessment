@@ -21,6 +21,7 @@ valid_deals as (
 
 final as (
     select
+        {{ dbt_utils.generate_surrogate_key(['deal_id', 'funnel_step', 'event_date']) }} as funnel_event_id,
         deal_id,
         funnel_step,
         event_date

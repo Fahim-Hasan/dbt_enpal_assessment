@@ -61,6 +61,10 @@ models:
           - not_null
       - name: user_email
         description: User's email address.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_match_regex:
+              arguments:
+                regex: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
       - name: user_modified_at
         description: Timestamp this user record was last modified in the source system.
 

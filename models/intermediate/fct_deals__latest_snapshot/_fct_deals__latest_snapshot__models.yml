@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: int_pipedrive__deal_created
+    description: >
+      One row represents one deal creation event. Complete, unfiltered passthrough of
+      stg_pipedrive__deal_changes where changed_field_key='ADD_TIME' -- NOT unique on deal_id:
+      the same 5 known colliding deal_ids (see macros/get_colliding_deal_ids.sql) each have two
+      add_time events, one per blended real deal. Excluded downstream in fct_deals__latest_snapshot,
+      not here (validity filtering is a mart-level concern, matching the rest of this project).
+    columns:
+      - name: deal_id
+        description: The deal that was created. Not unique -- see model description.
+        data_tests:
+          - not_null
+      - name: created_at
+        description: Timestamp the deal was created.
+        data_tests:
+          - not_null
+
+  - name: int_pipedrive__deal_lost_events
+    description: >
+      One row represents one deal's current (most recent) lost_reason event. Reduces
+      stg_pipedrive__deal_changes where changed_field_key='LOST_REASON' to one row per deal_id by
+      recency -- on today's data this only ever matters for the 5 known colliding deal_ids (each
+      blending two real deals' single lost events into what looks like one deal losing twice; see
+      fct_deals__latest_snapshot for the exclusion), not a real double-loss case, but kept generic
+      rather than assuming that always holds.
+    columns:
+      - name: deal_id
+        description: The deal that was marked lost. Grain of this table.
+        data_tests:
+          - unique
+          - not_null
+      - name: lost_reason_id
+        description: Joins to dim_deals__lost_reasons.lost_reason_id.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_deals__lost_reasons')
+                field: lost_reason_id
+      - name: lost_at
+        description: Timestamp of this deal's most recent lost_reason event.
+        data_tests:
+          - not_null
