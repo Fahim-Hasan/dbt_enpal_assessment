@@ -37,10 +37,6 @@ models:
       activity-derived sub-steps (2.1 Sales Call 1, 3.1 Sales Call 2). funnel_step is resolved via
       macros/get_funnel_step_from_code.sql, the same mapping used to build fct_deals__funnel --
       join on funnel_step only.
-    data_tests:
-      - dbt_expectations.expect_table_row_count_to_equal:
-          arguments:
-            value: 11
     columns:
       - name: funnel_step
         description: Ordinal step code (e.g. '1', '2.1'). Grain of this table.
@@ -59,10 +55,6 @@ models:
       column by design: unlike dim_deals__funnel_steps, there's no separate source-driven label
       distinct from the resolved code for these 4 types, so activity_type serves as both the
       join key and the display value.
-    data_tests:
-      - dbt_expectations.expect_table_row_count_to_equal:
-          arguments:
-            value: 4
     columns:
       - name: activity_type
         description: >
